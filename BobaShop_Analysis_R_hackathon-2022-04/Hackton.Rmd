@@ -1,0 +1,78 @@
+---
+title: "Hackton"
+author: "Shan Gao"
+date: "4/2/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(ggplot2)
+library(tidyverse)
+
+LAboba <- read.csv('LADemos.csv') %>%
+          rename(zipcode = zcta)
+school_count <- read.csv('school_count.csv')
+boba_count <- read.csv('boba_count.csv')
+```
+
+```{r}
+boba <- left_join(LAboba, boba_count, by = 'zipcode')
+boba <- left_join(boba, school_count, by = 'zipcode')
+boba <- mutate_all(boba, ~replace(., is.na(.), 0))
+```
+
+```{r}
+boba <- mutate(boba,log_median = log(medianIncome + 1))
+summary(boba)
+```
+
+```{r}
+cor(boba)
+```
+
+```{r}
+model_intercept <- lm(Boba_shop_cnt ~ 1, data = boba)
+model_full <- lm(Boba_shop_cnt ~ ., data = boba)
+
+summary(model_full)
+
+model_forward <- step(model_intercept, direction = 'forward', scope = formula(model_full), trace = 0)
+model_backward <- step(model_full, direction = 'backward', scope = formula(model_intercept), trace = 0)
+
+summary(model_forward)
+summary(model_backward)
+```
+
+```{r}
+ggplot(model_backward, aes(x = .fitted, y = .resid)) + geom_point()
+ggplot(model_backward, aes(x = .resid)) + geom_density()
+```
+
+```{r}
+set.seed(11111)
+cross_data_split <- rsample::initial_split(boba) ## 75% to 25% split
+
+cross_data_train <- rsample::training(cross_data_split)
+cross_data_test <- rsample::testing(cross_data_split)
+
+cross_model_train <- lm(Boba_shop_cnt ~ rateMale + rateFemale + rentShareOfIncome + degreeRate + rateNeverMarried + log_median, data = cross_data_train)
+cross_model_test <- lm(Boba_shop_cnt ~ rateMale + rateFemale + rentShareOfIncome + degreeRate + rateNeverMarried + log_median, data = cross_data_test)
+
+broom::glance(cross_model_train)
+broom::glance(cross_model_test)
+```
+
+```{r}
+OC <- read.csv('OCDemos.csv') %>%
+  mutate(log_median = log(medianIncome + 1))
+
+y_hat <- predict(model_backward, newdata = OC)
+
+max(y_hat)
+```
+
+
